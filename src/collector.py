@@ -11,7 +11,19 @@ class Collector():
     def __init__(self):
         self.all_symbols = tse.all_symbols
 
-    def collect(self, symbol, start_date='1400-01-01', end_date=jdatetime.datetime.today().strftime('%Y-%m-%d'), write_to_csv=False):
+    def collect(self, symbol:str, start_date:str='1400-01-01', end_date:str=jdatetime.datetime.today().strftime('%Y-%m-%d'), write_to_csv:bool=False):
+        """
+        Collect data for a symbol from start_date to end_date.
+
+        Args:
+            symbol: a stock symbol
+            start_date: start date for collected data. Defaults to '1400-01-01'.
+            end_date: end date for collected data. Defaults to today.
+            write_to_csv: save file as csv format or not. Defaults to False.
+
+        Returns:
+            pandas.DataFrame: Containing all useful market data.
+        """
         ticker = self.scrape(symbol)
         df = pd.concat([self.collect_history(ticker), self.collect_client(ticker)], axis=1)
 
@@ -20,25 +32,28 @@ class Collector():
         return df
 
     def slice_date(self, df, start_date:str, end_date:str):
-            """
-            Slice a ticker using start and end date.
-            """
-            start = jdatetime.datetime.strptime(start_date, '%Y-%m-%d').togregorian()
-            end = jdatetime.datetime.strptime(end_date, '%Y-%m-%d').togregorian()
+        """
+        Slice a market dataframe based on start_date and end_date.
+        """
+        start = jdatetime.datetime.strptime(start_date, '%Y-%m-%d').togregorian()
+        end = jdatetime.datetime.strptime(end_date, '%Y-%m-%d').togregorian()
 
-            return df[start:end]
+        return df[start:end]
 
     def collect_all(self):
         pass
 
     def scrape(self, symbol):
         """
-        Scrape data of symbol from pytse-client module.
+        Scrape data of symbol from pytse-client module and return a ticker object.
         """
         return tse.Ticker(symbol)
 
 
     def collect_history(self, ticker):
+        """
+        Collect Historical data of a ticker.
+        """
         df_history = ticker.history.loc[:, ['volume', 'value', 'close']]
         df_history.index = ticker.history.loc[:, 'date']
         df_history = self.rolling_mean_value(df_history)
@@ -46,6 +61,9 @@ class Collector():
         return df_history
 
     def collect_client(self, ticker):
+        """
+        Collect client-type data of a ticker.
+        """
         df_client = ticker.client_types.loc[:, [
             'individual_buy_count', 'individual_buy_value',
             'individual_sell_count', 'individual_sell_value',
@@ -70,11 +88,17 @@ class Collector():
         return df_client.loc[:, ['buy_per_capita', 'sell_per_capita', 'individual_power', 'individual_buy_percent', 'individual_sell_percent']]
 
     def rolling_mean_value(self, df_history, days=20):
+        """
+        Computes the moving value average.
+        """
         df_history['mean_value_20'] = df_history['value'].rolling(window=days, min_periods=1).mean()
         return df_history
 
 
     def get_individual_power(self, buy_per_capita, sell_per_capita):
+        """
+        Computes buyer/seller power based on average buy and sell value.
+        """
         if buy_per_capita >= sell_per_capita:
             return (buy_per_capita / sell_per_capita).round(decimals=2)
         else:
