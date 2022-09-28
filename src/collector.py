@@ -3,6 +3,8 @@ import pandas as pd
 import pytse_client as tse
 from loguru import logger
 
+from src.tickers_data import DATA_DIR
+
 
 class Collector():
     """
@@ -25,10 +27,16 @@ class Collector():
             pandas.DataFrame: Containing all useful market data.
         """
         ticker = self.scrape(symbol)
-        df = pd.concat([self.collect_history(ticker), self.collect_client(ticker)], axis=1)
+        df_history =  self.slice_date(self.collect_history(ticker), start_date, end_date)
+        df_client =  self.slice_date(self.collect_client(ticker), start_date, end_date)
+        df = pd.concat([df_history, df_client], axis=1)
 
         # Slice Date
         df = self.slice_date(df, start_date, end_date)
+
+        if write_to_csv:
+            path = DATA_DIR/(symbol + '.csv')
+            df.to_csv(path)
         return df
 
     def slice_date(self, df, start_date:str, end_date:str):
@@ -113,11 +121,12 @@ class Collector():
 
         return df[start:end]
 
+
     def scrape_funda(self):
         pass
 
 
 if __name__ == '__main__':
     collector = Collector()
-    df = collector.collect('فولاد')
+    df = collector.collect('فولاد', write_to_csv=True)
     logger.info(df)
