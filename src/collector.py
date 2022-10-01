@@ -60,6 +60,9 @@ class Collector():
         return df
 
     def collect_all(self, write_to_csv):
+        """
+        Collect all symbols data.
+        """
         all_tickers = {}
         logger.info("This may take few minutes...")
         for symbol in tse.all_symbols():
@@ -121,7 +124,7 @@ class Collector():
 
     def rolling_mean_value(self, df_history, days=20):
         """
-        Computes the moving value average.
+        Compute the moving value average.
         """
         df_history['mean_value_20'] = df_history['value'].rolling(window=days, min_periods=1).mean()
         return df_history
@@ -129,7 +132,7 @@ class Collector():
 
     def get_individual_power(self, buy_per_capita, sell_per_capita):
         """
-        Computes buyer/seller power based on average buy and sell value.
+        Compute buyer/seller power based on average buy and sell value.
         """
         if (not buy_per_capita) or (buy_per_capita == 0):
             return
@@ -143,6 +146,9 @@ class Collector():
             return - (sell_per_capita / buy_per_capita).astype('float').round(decimals=2)
 
     def load_data(self, path):
+        """
+        Load previously collected data from a path.
+        """
         df = pd.read_csv(path)
         df.index = df['date'].apply(pd.Timestamp)
         del df['date']
