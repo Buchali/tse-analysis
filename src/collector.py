@@ -1,3 +1,6 @@
+import datetime
+from pathlib import Path
+
 import jdatetime
 import pandas as pd
 import pytse_client as tse
@@ -10,45 +13,51 @@ class Collector():
     """
     Market data collector for Tehran Stock Exchange (tse).
     """
+    last_date = tse.Ticker('هم وزن').last_date
     def __init__(self):
         self.all_symbols = tse.all_symbols
 
-    def collect(self, symbol:str, start_date:str='1400-01-01', end_date:str=jdatetime.datetime.today().strftime('%Y-%m-%d'), write_to_csv:bool=False):
+    def collect(self, symbol:str, start_date:str='1400-01-01', end_date:str=last_date, write_to_csv:bool=False):
         """
         Collect data for a symbol from start_date to end_date.
 
         Args:
             symbol: a stock symbol
             start_date: start date for collected data. Defaults to '1400-01-01'.
-            end_date: end date for collected data. Defaults to today.
+            end_date: end date for collected data. Defaults to last open market date.
             write_to_csv: save file as csv format or not. Defaults to False.
 
         Returns:
             pandas.DataFrame: Containing all useful market data.
         """
+        # Date Conversion
+        start_date = jdatetime.datetime.strptime(start_date, '%Y-%m-%d').togregorian()
+        if isinstance(end_date, str):
+            end_date = jdatetime.datetime.strptime(end_date, '%Y-%m-%d').togregorian()
+
+        # Check if data already saved.
+        path = DATA_DIR / (symbol + '.csv')
+        if Path.exists(path):
+            df = self.load_data(path)
+            ldate = df.index[-1]
+            if ldate >= end_date:
+                return df.loc[start_date : end_date]
+
         ticker = self.scrape(symbol)
+        # Check if data is not scrapable!
         if (self.collect_history(ticker) is None) or (self.collect_client(ticker) is None):
             return
-        df_history =  self.slice_date(self.collect_history(ticker), start_date, end_date)
-        df_client =  self.slice_date(self.collect_client(ticker), start_date, end_date)
+
+        # Collect and Slice date
+        df_history =  self.collect_history(ticker)[start_date : end_date]
+        df_client =  self.collect_client(ticker)[start_date : end_date]
         df = pd.concat([df_history, df_client], axis=1)
 
-        # Slice Date
-        df = self.slice_date(df, start_date, end_date)
-
+        # Write to csv
         if write_to_csv:
-            path = DATA_DIR/(symbol + '.csv')
+            path = DATA_DIR / (symbol + '.csv')
             df.to_csv(path)
         return df
-
-    def slice_date(self, df, start_date:str, end_date:str):
-        """
-        Slice a market dataframe based on start_date and end_date.
-        """
-        start = jdatetime.datetime.strptime(start_date, '%Y-%m-%d').togregorian()
-        end = jdatetime.datetime.strptime(end_date, '%Y-%m-%d').togregorian()
-
-        return df[start:end]
 
     def collect_all(self, write_to_csv):
         all_tickers = {}
@@ -61,7 +70,6 @@ class Collector():
                 logger.info(e)
 
         return all_tickers
-
 
     def scrape(self, symbol):
         """
@@ -134,21 +142,12 @@ class Collector():
         else:
             return - (sell_per_capita / buy_per_capita).astype('float').round(decimals=2)
 
-    def slice_date(self, df, start_date='1390-01-01', end_date=jdatetime.datetime.today().strftime('%Y-%m-%d')):
-        """
-        Slice a ticker using start and end date.
-        """
-        start = jdatetime.datetime.strptime(start_date, '%Y-%m-%d').togregorian()
-        end = jdatetime.datetime.strptime(end_date, '%Y-%m-%d').togregorian()
-
-        return df[start:end]
-
-
-    def scrape_funda(self):
-        pass
-
+    def load_data(self, path):
+        df = pd.read_csv(path)
+        df.index = df['date'].apply(pd.Timestamp)
+        del df['date']
+        return df
 
 if __name__ == '__main__':
     collector = Collector()
     df = collector.collect_all(write_to_csv=True)
-    logger.info(df)
